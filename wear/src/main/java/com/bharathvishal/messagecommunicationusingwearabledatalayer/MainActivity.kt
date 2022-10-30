@@ -99,6 +99,9 @@ class MainActivity : AppCompatActivity(), AmbientModeSupport.AmbientCallbackProv
                 }
             }
         }
+
+
+
     }
 
     override fun onDataChanged(p0: DataEventBuffer) {
