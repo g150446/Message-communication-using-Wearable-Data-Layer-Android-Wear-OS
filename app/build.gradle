@@ -43,6 +43,8 @@ android {
 }
 
 dependencies {
+    implementation 'com.github.mik3y:usb-serial-for-android:3.4.6'
+    implementation 'com.google.android.material:material:1.0.0'
     implementation 'androidx.work:work-runtime-ktx:2.7.0-alpha03'
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"

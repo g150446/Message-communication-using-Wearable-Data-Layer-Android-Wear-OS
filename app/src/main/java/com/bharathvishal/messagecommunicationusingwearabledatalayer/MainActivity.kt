@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -40,6 +42,8 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
 
     private lateinit var binding: ActivityMainBinding
 
+    var tag="MainActivity"
+    lateinit var ubr:UsbBridge
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +53,9 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
 
         activityContext = this
         wearableDeviceConnected = false
+        binding.cbtn.setOnClickListener {conUsb()}
+
+        binding.rbtn.setOnClickListener {readUsb()}
 
 
         binding.checkwearablesButton.setOnClickListener {
@@ -66,6 +73,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
                 if (binding.messagecontentEditText.text!!.isNotEmpty()) {
 
                     val nodeId: String = messageEvent?.sourceNodeId!!
+                    Log.d("nodeid",nodeId)
                     // Set the data of the message to be the bytes of the Uri.
                     val payload: ByteArray =
                         binding.messagecontentEditText.text.toString().toByteArray()
@@ -369,5 +377,24 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    fun readUsb() {
+        try {
+            binding.mtext.setText(ubr.readUsb())
+        }catch (e:Exception){
+            binding.mtext.setText(e.toString())
+        }
+    }
+    fun conUsb() {
+        val manager = getSystemService(Context.USB_SERVICE) as UsbManager
+        val deviceList: HashMap<String, UsbDevice> = manager.deviceList
+        deviceList.values.forEach { device ->
+            //your code
+            Log.d(tag, "dev")
+        }
+
+        ubr= UsbBridge(manager)
+        binding.mtext.setText(ubr.logtxt)
     }
 }
