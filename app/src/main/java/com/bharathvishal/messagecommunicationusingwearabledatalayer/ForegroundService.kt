@@ -82,43 +82,46 @@ class ForegroundService: Service(), CoroutineScope by MainScope() {
             .setContentIntent(openIntent)
             .addAction(R.drawable.ic_launcher_foreground, "実行終了", sendPendingIntent)
             .build()
+        initialiseDevicePairing(this)
 
         Thread(
             Runnable {
                 while(true) {
-                    Thread.sleep(3000)
-                    Log.d("FGS","working")
+                    Thread.sleep(50)
+              //      Log.d("FGS","working")
 
                     try {
-                        initialiseDevicePairing(this)
-                        val mes = ubr.readUsb()
-                        val payload: ByteArray =
-                            mes.toByteArray()
+                               val mes = ubr.readUsb()
+                        if(mes!="0") {
+                            val payload: ByteArray =
+                                mes.toByteArray()
 
-                        Log.d("nodeid","bef")
+                            Log.d("nodeid", "bef")
 
-                    //    val nodeId: String = messageEvent?.sourceNodeId!!
-                        val nodeId: String = "17e215e4"
+                            //    val nodeId: String = messageEvent?.sourceNodeId!!
+                            val nodeId: String = "17e215e4"
 
-                        nodeId?.let{hoge->
-                            // hogeがnullでないときだけ実行
-                            Log.d("nodeid",nodeId)
+                            nodeId?.let { hoge ->
+                                // hogeがnullでないときだけ実行
+                                Log.d("nodeid", nodeId)
 
-                        }
-                        // Send the rpc
-                        // Instantiates clients without member variables, as clients are inexpensive to
-                        // create. (They are cached and shared between GoogleApi instances.)
-                        val sendMessageTask =
-                            Wearable.getMessageClient(this)
-                                .sendMessage(nodeId, MESSAGE_ITEM_RECEIVED_PATH, payload)
-
-                        sendMessageTask.addOnCompleteListener {
-                            if (it.isSuccessful) {
-                                Log.d("send1", "Message sent successfully")
-
-                            } else {
-                                Log.d("send1", "Message failed.")
                             }
+                            // Send the rpc
+                            // Instantiates clients without member variables, as clients are inexpensive to
+                            // create. (They are cached and shared between GoogleApi instances.)
+                            val sendMessageTask =
+                                Wearable.getMessageClient(this)
+                                    .sendMessage(nodeId, MESSAGE_ITEM_RECEIVED_PATH, payload)
+
+                            sendMessageTask.addOnCompleteListener {
+                                if (it.isSuccessful) {
+                                    Log.d("send1", "Message sent successfully")
+
+                                } else {
+                                    Log.d("send1", "Message failed.")
+                                }
+                            }
+
                         }
 
                     }catch (e: Exception){

@@ -130,6 +130,7 @@ class MainActivity : AppCompatActivity(), AmbientModeSupport.AmbientCallbackProv
 
             //Send back a message back to the source node
             //This acknowledges that the receiver activity is open
+            /*
             if (messageEventPath.isNotEmpty() && messageEventPath == APP_OPEN_WEARABLE_PAYLOAD_PATH) {
                 try {
                     // Get the node id of the node that created the data item from the host portion of
@@ -182,7 +183,8 @@ class MainActivity : AppCompatActivity(), AmbientModeSupport.AmbientCallbackProv
                     e.printStackTrace()
                 }
             }//emd of if
-            else if (messageEventPath.isNotEmpty() && messageEventPath == MESSAGE_ITEM_RECEIVED_PATH) {
+            */
+            if (messageEventPath.isNotEmpty() && messageEventPath == MESSAGE_ITEM_RECEIVED_PATH) {
                 try {
                     binding.messagelogTextView.visibility = View.VISIBLE
                     binding.textInputLayout.visibility = View.VISIBLE
@@ -192,7 +194,7 @@ class MainActivity : AppCompatActivity(), AmbientModeSupport.AmbientCallbackProv
                     val sbTemp = StringBuilder()
                     sbTemp.append("\n")
                     sbTemp.append(s1)
-                    sbTemp.append(" - (Received from mobile)")
+
                     Log.d("receive1", " $sbTemp")
                     binding.messagelogTextView.append(sbTemp)
 

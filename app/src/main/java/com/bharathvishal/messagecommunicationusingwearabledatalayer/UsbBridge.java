@@ -18,7 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class UsbBridge {
-    private static final int READ_WAIT_MILLIS = 100;
+    private static final int READ_WAIT_MILLIS = 50;
 
     String tag="usbbridge";
     public String logtxt="default";
