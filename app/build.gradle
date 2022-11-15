@@ -43,6 +43,7 @@ android {
 }
 
 dependencies {
+    implementation 'com.github.Jasonchenlijian:FastBle:2.4.0'
     implementation 'com.github.mik3y:usb-serial-for-android:3.4.6'
     implementation 'com.google.android.material:material:1.0.0'
     implementation 'androidx.work:work-runtime-ktx:2.7.0-alpha03'

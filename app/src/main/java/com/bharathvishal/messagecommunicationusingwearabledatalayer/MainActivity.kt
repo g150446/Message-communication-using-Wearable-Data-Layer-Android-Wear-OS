@@ -2,6 +2,7 @@ package com.bharathvishal.messagecommunicationusingwearabledatalayer
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.bluetooth.BluetoothGatt
 import android.content.Context
 import android.content.Intent
 import android.hardware.usb.UsbDevice
@@ -9,16 +10,28 @@ import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.bharathvishal.messagecommunicationusingwearabledatalayer.databinding.ActivityMainBinding
+import com.clj.fastble.BleManager
+import com.clj.fastble.callback.BleGattCallback
+import com.clj.fastble.callback.BleNotifyCallback
+import com.clj.fastble.callback.BleReadCallback
+import com.clj.fastble.callback.BleScanCallback
+import com.clj.fastble.data.BleDevice
+import com.clj.fastble.exception.BleException
+import com.clj.fastble.utils.HexUtil
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.*
 import kotlinx.coroutines.*
 import java.nio.charset.StandardCharsets
 import java.util.*
+import java.util.concurrent.Executors
+
 
 class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
     DataClient.OnDataChangedListener,
@@ -42,6 +55,11 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
 
     private lateinit var binding: ActivityMainBinding
 
+    private var targetDevice:BleDevice?=null
+    private val handler = Handler(Looper.getMainLooper())
+    private val tServiceUuid= UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
+    private val tCharUuid=UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+    val executor = Executors.newFixedThreadPool(1)
     var tag="MainActivity"
     lateinit var ubr:UsbBridge
     @SuppressLint("SetTextI18n")
@@ -50,14 +68,22 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
         binding = ActivityMainBinding.inflate(layoutInflater)
         val view = binding.root
         setContentView(view)
+        BleManager.getInstance().init(application)
+        BleManager.getInstance()
+            .enableLog(true)
+            .setReConnectCount(1, 5000)
+            .setConnectOverTime(20000).operateTimeout = 5000
 
         activityContext = this
         wearableDeviceConnected = false
-        binding.cbtn.setOnClickListener {conUsb()}
+        binding.sbtn.setOnClickListener { startScan() }
+        binding.cbtn.setOnClickListener {mConnect()}
 
-        binding.rbtn.setOnClickListener {readUsb()}
+        binding.rbtn.setOnClickListener {mRead()}
 
+        binding.nbtn.setOnClickListener { mNotify() }
 
+        binding.ebtn.setOnClickListener { exeRead() }
         binding.checkwearablesButton.setOnClickListener {
             if (!wearableDeviceConnected) {
                 val tempAct: Activity = activityContext as MainActivity
@@ -131,7 +157,192 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope(),
         }
     }
 
+    fun mNotify(){
 
+        executor.execute(Runnable {
+
+            BleManager.getInstance().notify(
+                targetDevice,
+                tServiceUuid.toString(),
+                tCharUuid.toString(),
+                object : BleNotifyCallback() {
+                    override fun onNotifySuccess() {
+
+                        sendToWear("notify success")
+                        Log.d(tag,"notify success")
+
+                    }
+                    override fun onNotifyFailure(exception: BleException) {}
+                    override fun onCharacteristicChanged(data: ByteArray) {
+
+
+                        sendToWear(HexUtil.formatHexString(data, true))
+                        Log.d(tag,HexUtil.formatHexString(data, true))
+                    }
+                })
+        })
+        }
+
+    fun mRead(){
+        val gatt = BleManager.getInstance().getBluetoothGatt(targetDevice)
+
+        var showtxt:String=":";
+        for (service in gatt.services) {
+            Log.d(tag,service.uuid.toString())
+            showtxt+=service.uuid.toString()
+            if(service.uuid.toString()==tServiceUuid.toString()){
+                Log.d(tag,"service found")
+                for (characteristic in service.characteristics) {
+                    Log.d(tag,characteristic.uuid.toString())
+                    if(characteristic.uuid.toString()==tCharUuid.toString()){
+                        BleManager.getInstance().read(
+                            targetDevice,
+                            tServiceUuid.toString(),
+                            tCharUuid.toString(),
+                            object : BleReadCallback() {
+                                override fun onReadSuccess(data: ByteArray) {
+
+                                    handler.post(){
+
+                                        binding.mtext.setText("val:"+HexUtil.formatHexString(data, true))
+                                    }
+                                }
+                                override fun onReadFailure(exception: BleException) {
+
+                                    handler.post(){
+
+                                        binding.mtext.setText("read failed")
+                                    }
+                                }
+                            })
+                    }
+                }
+            }
+
+        }
+    }
+    private fun startScan() {
+        BleManager.getInstance().scan(object : BleScanCallback() {
+            override fun onScanStarted(success: Boolean) {
+                // mDeviceAdapter?.clearScanDevice()
+                //    mDeviceAdapter?.notifyDataSetChanged()
+
+            }
+
+            override fun onLeScan(bleDevice: BleDevice) {
+                super.onLeScan(bleDevice)
+            }
+
+            override fun onScanning(bleDevice: BleDevice) {
+                // mDeviceAdapter?.addDevice(bleDevice)
+                //  mDeviceAdapter?.notifyDataSetChanged()
+                if (bleDevice.name != null) {
+                    Log.d(tag, bleDevice.name)
+                    if(bleDevice.name.contains("UART")){
+                        targetDevice=bleDevice
+                        BleManager.getInstance().cancelScan();
+                        handler.post(){
+                            binding.mtext.setText("target found")
+                        }
+                    }
+                }
+            }
+
+            override fun onScanFinished(scanResultList: List<BleDevice>) {
+
+            }
+        })
+    }
+
+    fun mConnect(){
+        BleManager.getInstance().connect(targetDevice, object : BleGattCallback() {
+            override fun onStartConnect() {}
+            override fun onConnectFail(bleDevice: BleDevice, exception: BleException) {}
+            override fun onConnectSuccess(bleDevice: BleDevice, gatt: BluetoothGatt, status: Int) {
+
+                handler.post(){
+
+                    binding.mtext.setText("connect success")
+                }
+            }
+            override fun onDisConnected(
+                isActiveDisConnected: Boolean,
+                bleDevice: BleDevice,
+                gatt: BluetoothGatt,
+                status: Int
+            ) {
+            }
+        })
+    }
+
+    fun exeRead(){
+        executor.execute(Runnable {
+
+            while (true) {
+                Log.d(tag, "I will log this line every 10 seconds forever")
+                Thread.sleep(2000);
+                BleManager.getInstance().read(
+                    targetDevice,
+                    tServiceUuid.toString(),
+                    tCharUuid.toString(),
+                    object : BleReadCallback() {
+                        override fun onReadSuccess(data: ByteArray) {
+
+
+
+                            Log.d(tag,"val:"+HexUtil.formatHexString(data, true))
+
+                            sendToWear(HexUtil.formatHexString(data, true))
+
+                        }
+                        override fun onReadFailure(exception: BleException) {
+
+
+
+                            Log.d(tag,"read failed")
+
+                        }
+                    })
+
+            }
+        })
+    }
+
+    fun sendToWear(mes:String){
+        try {
+            //val mes="a"
+            val payload: ByteArray =
+                mes.toByteArray()
+
+            Log.d("nodeid", "bef")
+
+            //    val nodeId: String = messageEvent?.sourceNodeId!!
+            val nodeId: String = "17e215e4"
+
+            nodeId?.let { hoge ->
+                // hogeがnullでないときだけ実行
+                Log.d("nodeid", nodeId)
+
+            }
+            // Send the rpc
+            // Instantiates clients without member variables, as clients are inexpensive to
+            // create. (They are cached and shared between GoogleApi instances.)
+            val sendMessageTask =
+                Wearable.getMessageClient(this)
+                    .sendMessage(nodeId, MESSAGE_ITEM_RECEIVED_PATH, payload)
+
+            sendMessageTask.addOnCompleteListener {
+                if (it.isSuccessful) {
+                    Log.d("send1", "Message sent successfully")
+
+                } else {
+                    Log.d("send1", "Message failed.")
+                }
+            }
+        }catch (e: Exception){
+            Log.d("FG",e.toString());
+        }
+    }
     @SuppressLint("SetTextI18n")
     private fun initialiseDevicePairing(tempAct: Activity) {
         //Coroutine

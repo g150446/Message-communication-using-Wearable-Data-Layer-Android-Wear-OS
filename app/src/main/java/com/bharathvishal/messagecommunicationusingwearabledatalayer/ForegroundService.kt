@@ -8,7 +8,9 @@ import android.graphics.Color
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -19,9 +21,15 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.*
 import java.lang.Runnable
-import java.util.HashMap
-import java.util.HashSet
+import java.util.*
 
+import com.clj.fastble.BleManager
+import com.clj.fastble.callback.BleGattCallback
+import com.clj.fastble.callback.BleReadCallback
+import com.clj.fastble.callback.BleScanCallback
+import com.clj.fastble.data.BleDevice
+import com.clj.fastble.exception.BleException
+import com.clj.fastble.utils.HexUtil
 
 class ForegroundService: Service(), CoroutineScope by MainScope() {
 
@@ -36,7 +44,13 @@ class ForegroundService: Service(), CoroutineScope by MainScope() {
     private val TAG_GET_NODES: String = "getnodes1"
     private var wearableDeviceConnected: Boolean = false
     private var messageEvent: MessageEvent? = null
-    lateinit var ubr:UsbBridge
+
+    var tag="fgs"
+    //private var mDeviceAdapter: DeviceAdapter? = null
+    private var targetDevice:BleDevice?=null
+    private val tServiceUuid= UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
+    private val tCharUuid= UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
+   // lateinit var ubr:UsbBridge
 
     companion object {
         const val CHANNEL_ID = "1111"
@@ -50,7 +64,7 @@ class ForegroundService: Service(), CoroutineScope by MainScope() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i("Service", "onStartCommand called")
 
-        conUsb()
+      //  conUsb()
         //1．通知領域タップで戻ってくる先のActivity
         val openIntent = Intent(this, MainActivity::class.java).let {
             PendingIntent.getActivity(this, 0, it,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -84,46 +98,44 @@ class ForegroundService: Service(), CoroutineScope by MainScope() {
             .build()
         initialiseDevicePairing(this)
 
+        Log.d(tag,"bef scan")
+        startScan()
         Thread(
             Runnable {
                 while(true) {
-                    Thread.sleep(50)
+                    Thread.sleep(1000)
               //      Log.d("FGS","working")
 
                     try {
-                               val mes = ubr.readUsb()
-                        if(mes!="0") {
-                            val payload: ByteArray =
-                                mes.toByteArray()
+val mes="a"
+                        val payload: ByteArray =
+                            mes.toByteArray()
 
-                            Log.d("nodeid", "bef")
+                        Log.d("nodeid", "bef")
 
-                            //    val nodeId: String = messageEvent?.sourceNodeId!!
-                            val nodeId: String = "17e215e4"
+                        //    val nodeId: String = messageEvent?.sourceNodeId!!
+                        val nodeId: String = "17e215e4"
 
-                            nodeId?.let { hoge ->
-                                // hogeがnullでないときだけ実行
-                                Log.d("nodeid", nodeId)
-
-                            }
-                            // Send the rpc
-                            // Instantiates clients without member variables, as clients are inexpensive to
-                            // create. (They are cached and shared between GoogleApi instances.)
-                            val sendMessageTask =
-                                Wearable.getMessageClient(this)
-                                    .sendMessage(nodeId, MESSAGE_ITEM_RECEIVED_PATH, payload)
-
-                            sendMessageTask.addOnCompleteListener {
-                                if (it.isSuccessful) {
-                                    Log.d("send1", "Message sent successfully")
-
-                                } else {
-                                    Log.d("send1", "Message failed.")
-                                }
-                            }
+                        nodeId?.let { hoge ->
+                            // hogeがnullでないときだけ実行
+                            Log.d("nodeid", nodeId)
 
                         }
+                        // Send the rpc
+                        // Instantiates clients without member variables, as clients are inexpensive to
+                        // create. (They are cached and shared between GoogleApi instances.)
+                        val sendMessageTask =
+                            Wearable.getMessageClient(this)
+                                .sendMessage(nodeId, MESSAGE_ITEM_RECEIVED_PATH, payload)
 
+                        sendMessageTask.addOnCompleteListener {
+                            if (it.isSuccessful) {
+                                Log.d("send1", "Message sent successfully")
+
+                            } else {
+                                Log.d("send1", "Message failed.")
+                            }
+                        }
                     }catch (e: Exception){
                         Log.d("FG",e.toString());
                     }
@@ -137,7 +149,36 @@ class ForegroundService: Service(), CoroutineScope by MainScope() {
 
         return START_STICKY
     }
+    private fun startScan() {
+        BleManager.getInstance().scan(object : BleScanCallback() {
+            override fun onScanStarted(success: Boolean) {
+                // mDeviceAdapter?.clearScanDevice()
+                //    mDeviceAdapter?.notifyDataSetChanged()
 
+            }
+
+            override fun onLeScan(bleDevice: BleDevice) {
+                super.onLeScan(bleDevice)
+            }
+
+            override fun onScanning(bleDevice: BleDevice) {
+                // mDeviceAdapter?.addDevice(bleDevice)
+                //  mDeviceAdapter?.notifyDataSetChanged()
+                if (bleDevice.name != null) {
+                    Log.d(tag, bleDevice.name)
+                    if(bleDevice.name.contains("UART")){
+                        targetDevice=bleDevice
+                        BleManager.getInstance().cancelScan();
+                        Log.d(tag,"t found")
+                    }
+                }
+            }
+
+            override fun onScanFinished(scanResultList: List<BleDevice>) {
+
+            }
+        })
+    }
     override fun stopService(name: Intent?): Boolean {
         return super.stopService(name)
     }
@@ -173,7 +214,7 @@ class ForegroundService: Service(), CoroutineScope by MainScope() {
             Log.d("fgs", "dev")
         }
 
-        ubr= UsbBridge(manager)
+     //   ubr= UsbBridge(manager)
 
     }
     private fun getNodes(context: Context): BooleanArray {
